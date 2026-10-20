@@ -4,3 +4,5 @@ dist/
 deck-integrity-reports/
 *.tmp
 docs/
+.venv/
+build/

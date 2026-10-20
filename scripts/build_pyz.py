@@ -18,7 +18,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         stage = pathlib.Path(tmp)
         shutil.copytree(ROOT / 'src' / 'deck_integrity', stage / 'deck_integrity',
-                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc', 'gui'))  # CLI only
         zipapp.create_archive(stage, target, interpreter='/usr/bin/env python3',
                               main='deck_integrity.cli:main_exit')
     print(f'Built {target} ({target.stat().st_size // 1024} KiB)')

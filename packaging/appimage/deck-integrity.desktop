@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Deck Integrity Suite
+GenericName=Data integrity diagnostics
+Comment=Non-destructive data-integrity tests for SteamOS handhelds
+Exec=deck-integrity-gui
+Icon=deck-integrity
+Categories=System;Utility;
+Terminal=false

@@ -1,0 +1,16 @@
+#!/bin/sh
+# Deck Integrity Suite AppImage launcher.
+#   ./DeckIntegrity-x86_64.AppImage              opens the GUI
+#   ./DeckIntegrity-x86_64.AppImage --cli ...    runs the command-line tool (same options as the .pyz)
+HERE="$(dirname "$(readlink -f "$0")")"
+export APPDIR="${APPDIR:-$HERE}"
+PY="$HERE/AppRun.python"   # the bundled relocatable Python's own launcher
+
+if [ "$1" = "--cli" ]; then
+    shift
+    exec "$PY" -I -m deck_integrity "$@"
+fi
+
+# Prefer native Wayland (KDE Plasma on SteamOS), fall back to X11.
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-wayland;xcb}"
+exec "$PY" -I -m deck_integrity.gui "$@"

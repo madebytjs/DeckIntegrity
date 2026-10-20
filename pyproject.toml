@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "deck-integrity"
+dynamic = ["version"]
+description = "Non-destructive data-integrity diagnostics for SteamOS handhelds and other Linux machines"
+readme = "README.md"
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.7"]
+
+[project.scripts]
+deck-integrity = "deck_integrity.cli:main_exit"
+
+[project.gui-scripts]
+deck-integrity-gui = "deck_integrity.gui.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "deck_integrity.VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"deck_integrity.gui" = ["icon.png"]
