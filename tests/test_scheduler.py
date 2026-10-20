@@ -34,7 +34,8 @@ class Base(unittest.TestCase):
 
 
 class EnduranceTests(Base):
-    def test_runs_rounds_until_time_is_up_and_writes_file_once(self):
+    def test_runs_until_time_is_up_and_writes_files_once(self):
+        # Timing-independent: how many rounds fit depends on the machine's disk speed.
         ctx = self.ctx()
         writes = []
         real = ctx.generate_random_file
@@ -42,10 +43,16 @@ class EnduranceTests(Base):
         run_checks(ctx, [zero.prepare, ram.prepare, ssd.prepare], duration_s=0.5)
         sched = ctx.rec.run_info['scheduler']
         self.assertEqual(sched['mode'], 'endurance')
-        self.assertGreaterEqual(sched['rounds'], 2)
+        self.assertGreaterEqual(sched['rounds'], 1)
+        self.assertGreaterEqual(sched['active_s'], 0.5)
         self.assertEqual(len(writes), 2)   # RAM + SSD files created once, however many rounds
         self.assertTrue(all(r['status'] in ('PASS', 'INFO', 'SKIP') for r in ctx.rec.results))
         self.assertEqual(list(self.tmp.glob('deck-integrity-*')), [])
+
+    def test_repeats_rounds_with_fast_checks(self):
+        ctx = self.ctx()   # zero check is fully faked, so a round takes microseconds
+        run_checks(ctx, [zero.prepare], duration_s=0.3)
+        self.assertGreaterEqual(ctx.rec.run_info['scheduler']['rounds'], 5)
 
     def test_first_failure_and_failure_times_recorded(self):
         tools = FakeTools({'head': lambda n: 'wrong' if n in (2, 4) else None})
@@ -126,6 +133,7 @@ class ControlTests(Base):
         self.assertFalse(c.stop_requested)
         writer.close()                       # GUI went away
         t.join(2)
+        reader.close()
         self.assertTrue(c.stop_requested)
 
     def test_broken_event_pipe_stops_run(self):
