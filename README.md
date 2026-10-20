@@ -26,7 +26,16 @@ python3 deck-integrity.pyz             # full run: 5 passes, 2 GiB SSD file, abo
 python3 deck-integrity.pyz --help
 ```
 
-Reports go to `~/deck-integrity-reports/<timestamp>/`:
+It only runs from a terminal. Double-clicking it does nothing apart from a notification, because it writes a large test file. Scripts and launchers can pass `--yes`.
+
+Each run gets its own folder, named so runs from different devices and OS versions sort and compare easily:
+
+```text
+~/deck-integrity-reports/2026-10-20_124234_Legion-Go-S-8ARP1_SteamOS-3.8.28_quick/
+                         date and time     device            OS               mode (quick, full, custom, partial)
+```
+
+Each folder contains:
 
 | File | Contents |
 |---|---|
@@ -36,7 +45,7 @@ Reports go to `~/deck-integrity-reports/<timestamp>/`:
 | `results.json` | Everything, per pass, machine-readable. Rewritten as it goes, so a crash still leaves evidence |
 | `system-info.json` | Device and software inventory |
 
-Exit codes: `0` no faults observed, `1` integrity fault observed, `2` a check could not complete, `130` interrupted.
+Exit codes: `0` no faults observed, `1` integrity fault observed, `2` a check could not complete, `3` refused to start without a terminal, `130` interrupted.
 
 ## Safety
 

@@ -4,20 +4,29 @@ from __future__ import annotations
 import argparse
 import datetime
 import pathlib
+import re
 import signal
 import sys
 import time
 import traceback
 
-from deck_integrity import VERSION, reports, sensors, sysinfo
+from deck_integrity import VERSION, reports, runner, sensors, sysinfo
 from deck_integrity.checks import ram, ssd, zero
 from deck_integrity.checks.common import Context
 from deck_integrity.recorder import Recorder, utc_now
 from deck_integrity.redact import Redactor
 
 CHECKS = {'zero': zero.run, 'ram': ram.run, 'ssd': ssd.run}
-EXIT_OK, EXIT_FAIL, EXIT_ERROR, EXIT_INTERRUPTED = 0, 1, 2, 130
+EXIT_OK, EXIT_FAIL, EXIT_ERROR, EXIT_NOT_CONFIRMED, EXIT_INTERRUPTED = 0, 1, 2, 3, 130
 LOW_BATTERY_PCT = 20
+DEFAULTS = {'passes': 5, 'file_mib': 2048, 'ram_mib': 256}
+QUICK = {'passes': 3, 'file_mib': 512, 'ram_mib': 128}
+# DMI product names Valve uses for the Steam Deck boards.
+VALVE_MODELS = {'jupiter': 'Steam-Deck-LCD', 'galileo': 'Steam-Deck-OLED'}
+PLACEHOLDER_DMI = {'', 'default string', 'system product name', 'to be filled by o.e.m.', 'none'}
+NOT_CONFIRMED_MSG = ('Deck Integrity Suite did not run: it was started without a terminal '
+                     '(for example by double-clicking it). It writes a large test file, so it only '
+                     'runs from Konsole, or with --yes.')
 
 
 class Terminated(KeyboardInterrupt):
@@ -48,11 +57,13 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help='skip a check (repeatable)')
     p.add_argument('--output', help='report directory (default ~/deck-integrity-reports/<timestamp>)')
     p.add_argument('--keep-file', action='store_true', help='keep the SSD test file afterwards')
+    p.add_argument('--yes', action='store_true',
+                   help='run even without a terminal (scripts, launchers); never needed in Konsole')
     a = p.parse_args(argv)
-    q = a.quick
-    a.passes = a.passes if a.passes is not None else (3 if q else 5)
-    a.file_mib = a.file_mib if a.file_mib is not None else (512 if q else 2048)
-    a.ram_mib = a.ram_mib if a.ram_mib is not None else (128 if q else 256)
+    preset = QUICK if a.quick else DEFAULTS
+    for k, v in preset.items():
+        if getattr(a, k) is None:
+            setattr(a, k, v)
     if not 1 <= a.passes <= 100:
         p.error('--passes must be 1-100')
     if not 32 <= a.file_mib <= 16384:
@@ -62,9 +73,60 @@ def parse_args(argv=None) -> argparse.Namespace:
     return a
 
 
-def default_output() -> pathlib.Path:
-    stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-    return pathlib.Path.home() / 'deck-integrity-reports' / stamp
+def _slug(s: str) -> str:
+    return re.sub(r'[^A-Za-z0-9.]+', '-', s).strip('-.')
+
+
+def device_label(dmi: dict) -> str:
+    """Human name for the hardware, e.g. Steam-Deck-OLED or Legion-Go-S-8ARP1."""
+    vendor = (dmi.get('sys_vendor') or '').strip()
+    product = (dmi.get('product_name') or '').strip()
+    if vendor.lower() == 'valve' and product.lower() in VALVE_MODELS:
+        return VALVE_MODELS[product.lower()]
+    for name in (dmi.get('product_family'), dmi.get('product_version')):
+        if name and name.strip().lower() not in PLACEHOLDER_DMI and re.search('[A-Za-z]{3}', name):
+            return _slug(name)
+    return _slug(f'{vendor} {product}') or 'unknown-device'
+
+
+def os_label(rel: dict) -> str:
+    return _slug(f'{rel.get("NAME") or "Linux"} {rel.get("VERSION_ID") or ""}') or 'Linux'
+
+
+def mode_label(args) -> str:
+    sizes = {k: getattr(args, k) for k in DEFAULTS}
+    if args.skip:
+        return 'partial'
+    if sizes == QUICK:
+        return 'quick'
+    return 'full' if sizes == DEFAULTS else 'custom'
+
+
+def run_name(args, now: datetime.datetime | None = None) -> str:
+    """Sortable, comparable folder name: 2026-10-20_124234_Steam-Deck-OLED_SteamOS-3.8.28_quick."""
+    now = now or datetime.datetime.now()
+    return '_'.join([now.strftime('%Y-%m-%d_%H%M%S'), device_label(sysinfo.dmi()),
+                     os_label(sysinfo.os_release()), mode_label(args)])
+
+
+def default_output(args) -> pathlib.Path:
+    return pathlib.Path.home() / 'deck-integrity-reports' / run_name(args)
+
+
+def interactive() -> bool:
+    try:
+        return sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def notify(msg: str) -> None:
+    """Best-effort desktop notification, so a double-click is not silently ignored."""
+    try:
+        runner.run_command(['notify-send', '--app-name=Deck Integrity Suite',
+                            'Deck Integrity Suite', msg], timeout=5)
+    except Exception:
+        pass
 
 
 def preflight(ctx) -> None:
@@ -81,9 +143,10 @@ def preflight(ctx) -> None:
 
 
 def run(args, ctx_factory=Context) -> int:
-    out = pathlib.Path(args.output).expanduser().resolve() if args.output else default_output()
+    out = pathlib.Path(args.output).expanduser().resolve() if args.output else default_output(args)
     rec = Recorder(out, Redactor())
     rec.args = {k: v for k, v in vars(args).items() if k != 'output'}
+    rec.args['mode'] = mode_label(args)
     ctx = ctx_factory(rec=rec, args=args)
     info: dict = {}
     rec.log(f'Deck Integrity Suite {VERSION} | started {rec.started} (UTC)')
@@ -142,6 +205,10 @@ def run(args, ctx_factory=Context) -> int:
 
 def main(argv=None) -> int:
     args = parse_args(argv)
+    if not args.yes and not interactive():
+        print(NOT_CONFIRMED_MSG, file=sys.stderr)
+        notify(NOT_CONFIRMED_MSG)
+        return EXIT_NOT_CONFIRMED
     install_signal_handlers()
     return run(args)
 

@@ -10,6 +10,7 @@ _IDENT_LINE = re.compile(
     r'(?im)^.*(?:serial number|serial_number|\bserial\b|wwn|eui64|nguid|mac address|'
     r'host name|hostname|product_uuid).*$')
 _GENERIC_USERS = {'deck', 'root', 'user', 'steam'}
+_GENERIC_HOSTS = {'steamdeck', 'localhost'}
 _MAC = re.compile(r'\b[0-9a-f]{2}(?::[0-9a-f]{2}){5}\b', re.I)
 
 
@@ -23,6 +24,8 @@ class Redactor:
         self.users = sorted({u for u in users if u and len(u) > 2 and u not in _GENERIC_USERS},
                             key=len, reverse=True)
         self.hostname = hostname if hostname is not None else platform.node()
+        if self.hostname in _GENERIC_HOSTS:   # SteamOS default; also its VARIANT_ID
+            self.hostname = ''
 
     def __call__(self, text) -> str:
         s = str(text)

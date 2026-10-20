@@ -19,8 +19,10 @@ jobs:
         run: PYTHONPATH=src:tests python -m unittest discover -s tests -t tests -v
       - name: Build single-file bundle
         run: python scripts/build_pyz.py
+      - name: Refuses to run without a terminal (double-click guard)
+        run: python dist/deck-integrity.pyz --quick < /dev/null; test $? -eq 3
       - name: Smoke run on a real Linux host
-        run: python dist/deck-integrity.pyz --passes 2 --file-mib 64 --ram-mib 32 --output "$RUNNER_TEMP/report" || test $? -eq 1
+        run: python dist/deck-integrity.pyz --passes 2 --file-mib 64 --ram-mib 32 --yes --output "$RUNNER_TEMP/report" || test $? -eq 1
       - uses: actions/upload-artifact@v4
         with:
           name: report-py${{ matrix.python }}
