@@ -24,7 +24,7 @@ def device_line() -> str:
 class MainWindow(QMainWindow):
     def __init__(self, engine: Engine | None = None):
         super().__init__()
-        self.setWindowTitle('Deck Integrity Suite')
+        self.setWindowTitle('DeckIntegrity')
         self.engine = engine or Engine(self)
         self._closing = False
 
@@ -39,7 +39,7 @@ class MainWindow(QMainWindow):
             logo = QLabel()
             logo.setPixmap(QPixmap(str(icon)).scaled(40, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
             head.addWidget(logo)
-        head.addWidget(label('Deck Integrity Suite', 'title'))
+        head.addWidget(label('DeckIntegrity', 'title'))
         head.addStretch()
         head.addWidget(label(f'v{VERSION}', 'muted'))
         v.addLayout(head)

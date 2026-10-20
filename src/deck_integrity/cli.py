@@ -27,7 +27,7 @@ QUICK = {'passes': 3, 'file_mib': 512, 'ram_mib': 128}
 # DMI product names Valve uses for the Steam Deck boards.
 VALVE_MODELS = {'jupiter': 'Steam-Deck-LCD', 'galileo': 'Steam-Deck-OLED'}
 PLACEHOLDER_DMI = {'', 'default string', 'system product name', 'to be filled by o.e.m.', 'none'}
-NOT_CONFIRMED_MSG = ('Deck Integrity Suite did not run: it was started without a terminal '
+NOT_CONFIRMED_MSG = ('DeckIntegrity did not run: it was started without a terminal '
                      '(for example by double-clicking it). It writes a large test file, so it only '
                      'runs from Konsole, or with --yes.')
 
@@ -136,8 +136,8 @@ def interactive() -> bool:
 def notify(msg: str) -> None:
     """Best-effort desktop notification, so a double-click is not silently ignored."""
     try:
-        runner.run_command(['notify-send', '--app-name=Deck Integrity Suite',
-                            'Deck Integrity Suite', msg], timeout=5)
+        runner.run_command(['notify-send', '--app-name=DeckIntegrity',
+                            'DeckIntegrity', msg], timeout=5)
     except Exception:
         pass
 
@@ -169,7 +169,7 @@ def run(args, ctx_factory=Context, listeners=(), control: Control | None = None,
              duration_s=args.endurance * 60 if args.endurance else None,
              file_mib=args.file_mib, ram_mib=args.ram_mib)
     info: dict = {}
-    rec.log(f'Deck Integrity Suite {VERSION} | started {rec.started} (UTC)')
+    rec.log(f'DeckIntegrity {VERSION} | started {rec.started} (UTC)')
     rec.log('Non-destructive: writes only its own temporary test files and reports. No root required.')
     rec.log('Avoid running during large downloads or game installs. Ctrl+C stops cleanly.')
     rec.log('Reports: ' + str(out))

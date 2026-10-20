@@ -101,7 +101,7 @@ def support_summary(rec: Recorder, info: dict) -> str:
     tests = [r for r in rec.results if r['category'] not in INVENTORY]
     bad = [r for r in tests if r['status'] in ('FAIL', 'ERROR')]
     warn = [r for r in rec.results if r['status'] == 'WARN']
-    lines = [f'Deck Integrity Suite {VERSION} - support summary', '',
+    lines = [f'DeckIntegrity {VERSION} - support summary', '',
              f'Run: {rec.started} to {rec.finished or "?"} (UTC), state: {rec.state}',
              _device_line(info), '',
              'Result counts: ' + ', '.join(f'{k} {v}' for k, v in c.items() if v), '']

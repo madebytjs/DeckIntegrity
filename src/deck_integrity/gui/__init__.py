@@ -1,1 +1,1 @@
-"""Desktop GUI for Deck Integrity Suite. Requires PySide6; the engine does not."""
+"""Desktop GUI for DeckIntegrity. Requires PySide6; the engine does not."""

@@ -1,7 +1,7 @@
 <h1 align="center">
-  <img src="assets/logo.png" alt="Deck Integrity Suite logo" width="200">
+  <img src="assets/logo.png" alt="DeckIntegrity logo" width="200">
   <br>
-  Deck Integrity Suite
+  DeckIntegrity
   <br>
 </h1>
 
@@ -26,7 +26,7 @@
 
 ## 📖 About
 
-Deck Integrity Suite reads the same data again and again through independent paths and records every result. If your handheld sometimes corrupts data (files that hash differently each time, games that fail to verify, errors that come and go), it collects evidence you can hand to support or post in a bug report.
+DeckIntegrity reads the same data again and again through independent paths and records every result. If your handheld sometimes corrupts data (files that hash differently each time, games that fail to verify, errors that come and go), it collects evidence you can hand to support or post in a bug report.
 
 It came out of a Steam Deck OLED that produced different SHA-256 hashes for the same unchanged file, and even for a stream of zeros that never touches storage. The faults came and went between reboots, which made them hard to prove. This tool repeats the tests for as long as you like, records exactly when anything goes wrong, and keeps what was observed separate from what it might mean.
 

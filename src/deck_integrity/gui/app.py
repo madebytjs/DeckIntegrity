@@ -18,7 +18,7 @@ def main(argv=None) -> int:
     from deck_integrity.gui.window import MainWindow
 
     app = QApplication(sys.argv if argv is None else argv)
-    app.setApplicationName('Deck Integrity Suite')
+    app.setApplicationName('DeckIntegrity')
     app.setApplicationVersion(VERSION)
     app.setDesktopFileName('deck-integrity')   # matches the .desktop file, for the Wayland icon
     app.setStyleSheet(QSS)

@@ -98,7 +98,7 @@ class Recorder:
         return {s: sum(r['status'] == s for r in self.results) for s in STATUSES}
 
     def to_dict(self) -> dict:
-        return {'tool': 'Deck Integrity Suite', 'version': VERSION, 'state': self.state,
+        return {'tool': 'DeckIntegrity', 'version': VERSION, 'state': self.state,
                 'started_utc': self.started, 'finished_utc': self.finished,
                 'args': self.args, 'run': self.run_info, 'counts': self.counts(),
                 'tests': self.results, 'live': self.live, 'commands': self.commands}
