@@ -89,7 +89,7 @@ The same engine runs without the app, from Konsole:
 ./DeckIntegrity-x86_64.AppImage --cli --help
 ```
 
-Prefer something tiny? `deck-integrity.pyz` (about 75 KiB, on the Releases page) runs with the Python already on SteamOS: `python3 deck-integrity.pyz --quick`. It only runs from a terminal; double-clicking it does nothing apart from a notification.
+Prefer something tiny? `deck-integrity.pyz` (under 100 KiB, on the Releases page) runs with the Python already on SteamOS: `python3 deck-integrity.pyz --quick`. It only runs from a terminal; double-clicking it does nothing apart from a notification.
 
 ## 📄 Reports
 
