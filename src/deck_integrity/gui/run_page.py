@@ -181,10 +181,15 @@ class RunPage(QWidget):
         self.activity.setText('')
         self._running_buttons(False)
 
-    def show_crash(self, code: int, stderr_tail: list) -> None:
+    def show_crash(self, code: int, stderr_tail: list, did_not_start: bool = False) -> None:
         self.finished = True
-        self._set_status('The test engine stopped unexpectedly', theme.FAIL)
-        self.detail.setText(f'Exit code {code}. Any partial results are in the report folder.')
+        if did_not_start:
+            self._set_status('The test engine did not start', theme.FAIL)
+            self.detail.setText('No tests ran and nothing was written. The log below shows what was '
+                                'launched; please include it if you report this.')
+        else:
+            self._set_status('The test engine stopped unexpectedly', theme.FAIL)
+            self.detail.setText(f'Exit code {code}. Any partial results are in the report folder.')
         self.log.appendPlainText('\n'.join(stderr_tail))
         self.log_btn.setChecked(True)
         self._running_buttons(False)

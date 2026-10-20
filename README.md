@@ -33,7 +33,7 @@ It came out of a Steam Deck OLED that produced different SHA-256 hashes for the 
 > [!WARNING]
 > **Use at your own risk.** DeckIntegrity is unofficial, comes with no warranty, and is not affiliated with Valve or Lenovo. It is designed to be non-destructive, but it does write test files and work your device hard. See the [Disclaimer](#disclaimer).
 
-> **Status:** v0.3. The command-line engine has been tested on a Legion Go S running SteamOS 3.8. The desktop app and AppImage are new, and Steam Deck testing is pending.
+> **Status:** v0.3.1. The command-line engine has been tested on a Legion Go S running SteamOS 3.8. The desktop app and AppImage are new, and Steam Deck testing is pending.
 
 ### ✨ Features
 

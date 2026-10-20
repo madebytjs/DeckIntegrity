@@ -111,7 +111,8 @@ class MainWindow(QMainWindow):
 
     def on_engine_ended(self, code: int, saw_finish: bool) -> None:
         if not saw_finish:
-            self.run_page.show_crash(code, self.engine.stderr_tail)
+            self.run_page.show_crash(code, self.engine.stderr_tail,
+                                     did_not_start=self.engine.failed_to_start or not self.engine.saw_start)
         if self._closing:
             self.close()
 

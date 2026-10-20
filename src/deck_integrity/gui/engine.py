@@ -11,11 +11,12 @@ import os
 import pathlib
 import sys
 
-from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, Signal
+from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
 import deck_integrity
 
 STOP_GRACE_MS = 15000
+START_TIMEOUT_MS = 30000
 
 
 def engine_command(options: dict) -> list:
@@ -33,6 +34,22 @@ def engine_command(options: dict) -> list:
     if options.get('output'):
         args += ['--output', str(options['output'])]
     return args
+
+
+def interpreter() -> list:
+    """Command that runs the bundled Python.
+
+    Inside the AppImage sys.executable can point at the AppImage itself (the
+    portable Python reports its launcher, not the real binary), and running that
+    opens a second copy of the GUI instead of the engine. So use the bundled
+    Python's own launcher, the same one AppRun uses for --cli.
+    """
+    appdir = os.environ.get('APPDIR')
+    if appdir:
+        bundled = pathlib.Path(appdir) / 'AppRun.python'
+        if bundled.exists():
+            return [str(bundled), '-I']
+    return [sys.executable]
 
 
 def parse_lines(buffer: bytes) -> tuple:
@@ -61,6 +78,9 @@ class Engine(QObject):
         self._buf = b''
         self._err = b''
         self.saw_finish = False
+        self.saw_start = False
+        self._run_id = 0
+        self.failed_to_start = False
         self.stderr_tail: list = []
 
     @property
@@ -71,6 +91,7 @@ class Engine(QObject):
         if self.running:
             raise RuntimeError('engine already running')
         self._buf, self._err, self.saw_finish, self.stderr_tail = b'', b'', False, []
+        self.failed_to_start = False
         p = QProcess(self)
         env = QProcessEnvironment.systemEnvironment()
         # Make the package importable when running from a source checkout.
@@ -81,8 +102,28 @@ class Engine(QObject):
         p.readyReadStandardOutput.connect(self._on_stdout)
         p.readyReadStandardError.connect(self._on_stderr)
         p.finished.connect(self._on_finished)
+        p.errorOccurred.connect(self._on_error)
         self.proc = p
-        p.start(sys.executable, engine_command(options))
+        self.saw_start = False
+        cmd = interpreter() + engine_command(options)
+        self.stderr_line.emit('Starting engine: ' + ' '.join(cmd))
+        p.start(cmd[0], cmd[1:])
+        # Watchdog: the engine announces itself within seconds. If it never does,
+        # something else was launched; stop it rather than show "Starting..." forever.
+        self._run_id += 1
+        QTimer.singleShot(START_TIMEOUT_MS, lambda rid=self._run_id: self._check_started(rid))
+
+    def _check_started(self, run_id: int) -> None:
+        if run_id == self._run_id and self.running and not self.saw_start:
+            self.failed_to_start = True
+            self.stderr_line.emit(f'The engine did not report in within {START_TIMEOUT_MS // 1000}s; '
+                                  'stopping it.')
+            self.kill()
+
+    def _on_error(self, err) -> None:
+        if err == QProcess.FailedToStart:
+            self.stderr_line.emit('Could not start the engine: ' + self.proc.errorString())
+            self.ended.emit(-1, False)
 
     def send(self, command: str) -> None:
         if self.running:
@@ -108,6 +149,8 @@ class Engine(QObject):
         for line in bad:
             self.stderr_line.emit('unparsed engine output: ' + line)
         for e in events:
+            if e.get('event') == 'start':
+                self.saw_start = True
             if e.get('event') == 'finish':
                 self.saw_finish = True
             self.event.emit(e)

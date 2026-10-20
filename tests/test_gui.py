@@ -43,6 +43,20 @@ class EngineUnitTests(unittest.TestCase):
         self.assertIn('--keep-file', e)
         self.assertEqual(engine_command(SMALL)[engine_command(SMALL).index('--passes') + 1], '1')
 
+    def test_interpreter_prefers_bundled_python_inside_appimage(self):
+        # Regression: in the AppImage, sys.executable relaunched the GUI instead of the engine.
+        import sys
+        from deck_integrity.gui.engine import interpreter
+        tmp = pathlib.Path(tempfile.mkdtemp())
+        try:
+            (tmp / 'AppRun.python').write_text('')
+            with mock.patch.dict(os.environ, {'APPDIR': str(tmp)}):
+                self.assertEqual(interpreter(), [str(tmp / 'AppRun.python'), '-I'])
+            with mock.patch.dict(os.environ, {'APPDIR': ''}):
+                self.assertEqual(interpreter(), [sys.executable])
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_parse_lines_keeps_partial_tail(self):
         from deck_integrity.gui.engine import parse_lines
         events, rest, bad = parse_lines(b'{"event":"a"}\nnot json\n{"event":"b"}\n{"event":"c')
@@ -152,6 +166,20 @@ class WindowIntegrationTests(unittest.TestCase):
         self.assertTrue(page.table.rows)
         res = json.loads((self.tmp / 'r' / 'results.json').read_text())
         self.assertEqual(res['state'], 'completed')
+
+    def test_wrong_program_is_stopped_by_watchdog_not_left_hanging(self):
+        # Simulates the AppImage bug: something starts but never speaks the engine protocol.
+        import sys
+        from deck_integrity.gui import engine as engine_mod
+        silent = [sys.executable, '-c', 'import time; time.sleep(60)']
+        with mock.patch.object(engine_mod, 'interpreter', return_value=silent), \
+                mock.patch.object(engine_mod, 'START_TIMEOUT_MS', 1500):
+            self.win.start({**SMALL, 'output': str(self.tmp / 'r')})
+            wait_for(self.win.engine.ended, 20000)
+        self.assertFalse(self.win.engine.running)
+        self.assertTrue(self.win.engine.failed_to_start)
+        self.assertEqual(self.win.run_page.status.text(), 'The test engine did not start')
+        self.assertIn('Starting engine:', self.win.run_page.log.toPlainText())
 
     def test_closing_mid_run_stops_cleanly_and_saves(self):
         opts = {**SMALL, 'mode': 'endurance', 'endurance_min': 5, 'output': str(self.tmp / 'r')}
