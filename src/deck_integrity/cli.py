@@ -12,7 +12,7 @@ import threading
 import time
 import traceback
 
-from deck_integrity import VERSION, reports, runner, sensors, sysinfo
+from deck_integrity import DISCLAIMER, VERSION, reports, runner, sensors, sysinfo
 from deck_integrity.checks import ram, ssd, zero
 from deck_integrity.checks.common import Context
 from deck_integrity.recorder import Recorder, utc_now
@@ -49,7 +49,8 @@ def install_signal_handlers() -> None:
 def parse_args(argv=None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog='deck-integrity',
-        description='Non-destructive SteamOS/Linux data-integrity diagnostics with logged results.')
+        description='Non-destructive SteamOS/Linux data-integrity diagnostics with logged results.',
+        epilog='Use at your own risk. ' + DISCLAIMER)
     p.add_argument('--version', action='version', version=f'%(prog)s {VERSION}')
     p.add_argument('--quick', action='store_true',
                    help='short run: 3 passes, 512 MiB SSD file, 128 MiB RAM file')

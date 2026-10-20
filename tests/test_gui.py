@@ -80,6 +80,51 @@ class RunPageTests(unittest.TestCase):
         self.assertIn('Boom', self.page.log.toPlainText())
 
 
+def isolated_settings(tmp: pathlib.Path) -> None:
+    from PySide6.QtCore import QSettings
+    QSettings.setPath(QSettings.IniFormat, QSettings.UserScope, str(tmp / 'settings'))
+
+
+@unittest.skipUnless(HAVE_QT, 'PySide6 not installed')
+class DisclaimerTests(unittest.TestCase):
+    def setUp(self):
+        app()
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        isolated_settings(self.tmp)
+        from deck_integrity.gui.window import MainWindow
+        self.win = MainWindow()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_cancel_blocks_the_test_and_is_not_remembered(self):
+        from PySide6.QtCore import QSettings
+        with mock.patch.object(QMessageBox, 'exec', return_value=0), \
+                mock.patch.object(QMessageBox, 'clickedButton', return_value=None), \
+                mock.patch.object(self.win.engine, 'start') as start:
+            self.win.start(SMALL)
+        start.assert_not_called()
+        s = QSettings(QSettings.IniFormat, QSettings.UserScope, 'DeckIntegrity', 'DeckIntegrity')
+        self.assertEqual(s.value('disclaimer_accepted', ''), '')
+
+    def test_accept_runs_and_is_remembered(self):
+        shown = []
+
+        def click_agree(box):
+            shown.append(box.informativeText())
+            agree = next(b for b in box.buttons() if b.text().startswith('I understand'))
+            box.clickedButton = lambda: agree
+            return 0
+
+        with mock.patch.object(QMessageBox, 'exec', click_agree), \
+                mock.patch.object(self.win.engine, 'start') as start:
+            self.win.start(SMALL)
+            self.win.start(SMALL)   # second time: no dialog
+        self.assertEqual(start.call_count, 2)
+        self.assertEqual(len(shown), 1)
+        self.assertIn('at your own risk', shown[0])
+
+
 @unittest.skipUnless(HAVE_QT, 'PySide6 not installed')
 class WindowIntegrationTests(unittest.TestCase):
     """Drive the real engine as a child process, exactly as the app does."""
@@ -87,8 +132,10 @@ class WindowIntegrationTests(unittest.TestCase):
     def setUp(self):
         app()
         self.tmp = pathlib.Path(tempfile.mkdtemp())
+        isolated_settings(self.tmp)
         from deck_integrity.gui.window import MainWindow
         self.win = MainWindow()
+        self.win.accept_disclaimer = lambda: True
 
     def tearDown(self):
         if self.win.engine.running:

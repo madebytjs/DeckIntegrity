@@ -4,12 +4,14 @@ from __future__ import annotations
 import pathlib
 import platform
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QMainWindow, QMessageBox, QStackedWidget,
                                QVBoxLayout, QWidget)
 
-from deck_integrity import VERSION, cli, sysinfo
+from deck_integrity import DISCLAIMER, VERSION, cli, sysinfo
+
+DISCLAIMER_VERSION = '1'   # bump when the wording changes materially, to ask again
 from deck_integrity.gui.engine import STOP_GRACE_MS, Engine
 from deck_integrity.gui.run_page import RunPage
 from deck_integrity.gui.setup_page import SetupPage, label
@@ -68,7 +70,27 @@ class MainWindow(QMainWindow):
         self.setup.refresh_history()
         self.stack.setCurrentWidget(self.setup)
 
+    def accept_disclaimer(self) -> bool:
+        """One-time 'use at your own risk' acknowledgement before the first test."""
+        settings = QSettings(QSettings.IniFormat, QSettings.UserScope, 'DeckIntegrity', 'DeckIntegrity')
+        if settings.value('disclaimer_accepted', '') == DISCLAIMER_VERSION:
+            return True
+        box = QMessageBox(self)
+        box.setWindowTitle('Use at your own risk')
+        box.setIcon(QMessageBox.Warning)
+        box.setText('Before your first test')
+        box.setInformativeText(DISCLAIMER)
+        agree = box.addButton('I understand, continue', QMessageBox.AcceptRole)
+        box.addButton('Cancel', QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is not agree:
+            return False
+        settings.setValue('disclaimer_accepted', DISCLAIMER_VERSION)
+        return True
+
     def start(self, options: dict) -> None:
+        if not self.accept_disclaimer():
+            return
         self.run_page.reset()
         self.stack.setCurrentWidget(self.run_page)
         self.engine.start(options)

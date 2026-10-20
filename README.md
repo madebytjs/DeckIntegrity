@@ -30,6 +30,9 @@ DeckIntegrity reads the same data again and again through independent paths and 
 
 It came out of a Steam Deck OLED that produced different SHA-256 hashes for the same unchanged file, and even for a stream of zeros that never touches storage. The faults came and went between reboots, which made them hard to prove. This tool repeats the tests for as long as you like, records exactly when anything goes wrong, and keeps what was observed separate from what it might mean.
 
+> [!WARNING]
+> **Use at your own risk.** DeckIntegrity is unofficial, comes with no warranty, and is not affiliated with Valve or Lenovo. It is designed to be non-destructive, but it does write test files and work your device hard. See the [Disclaimer](#disclaimer).
+
 > **Status:** v0.3. The command-line engine has been tested on a Legion Go S running SteamOS 3.8. The desktop app and AppImage are new, and Steam Deck testing is pending.
 
 ### ✨ Features
@@ -119,6 +122,19 @@ python scripts/build_pyz.py                                # builds dist/deck-in
 ```
 
 The engine is Python 3.9+ standard library only; the app adds PySide6. The AppImage is built by GitHub Actions (`scripts/build_appimage.sh`), and pushing a `v*` tag creates a draft release with both downloads attached.
+
+<a id="disclaimer"></a>
+
+## ⚠️ Disclaimer
+
+DeckIntegrity is free, unofficial software provided **as is**, without warranty of any kind, and you use it **entirely at your own risk**.
+
+- It is designed to be non-destructive: it never needs root, never touches system files or partitions, and deletes its own test files. It still writes and reads large test files and keeps your device busy, which adds heat, battery drain and some SSD wear.
+- The authors are not responsible for any damage, data loss, failed repairs, voided warranties or other problems with your device. Back up anything important first.
+- Results are evidence to help an investigation, not a diagnosis. A pass does not prove a device is healthy, and a failure does not prove which part is faulty. Contact your device maker's support for repairs.
+- DeckIntegrity is not affiliated with or endorsed by Valve, Lenovo or any other device maker. Steam, Steam Deck and SteamOS are trademarks of Valve Corporation. Legion is a trademark of Lenovo.
+
+The app shows this notice before your first test. The [MIT licence](LICENSE) contains the full warranty disclaimer.
 
 ## 📜 Licence
 
