@@ -12,12 +12,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/madebytjs/DeckIntegrity/releases"><img src="https://img.shields.io/github/downloads/madebytjs/DeckIntegrity/total?color=b26bff" alt="Downloads"></a>
-  <a href="https://github.com/madebytjs/DeckIntegrity/releases/latest"><img src="https://img.shields.io/github/v/release/madebytjs/DeckIntegrity?color=ff4f86" alt="Latest release"></a>
+  <a href="https://github.com/madebytjs/DeckIntegrity/releases"><img src="https://img.shields.io/github/downloads/madebytjs/DeckIntegrity/total?color=b26bff&v=1" alt="Downloads"></a>
+  <a href="https://github.com/madebytjs/DeckIntegrity/releases/latest"><img src="https://img.shields.io/github/v/release/madebytjs/DeckIntegrity?color=ff4f86&v=1" alt="Latest release"></a>
   <a href="https://github.com/madebytjs/DeckIntegrity/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/madebytjs/DeckIntegrity/tests.yml?branch=main&label=tests" alt="Tests"></a>
-  <a href="https://github.com/madebytjs/DeckIntegrity/stargazers"><img src="https://img.shields.io/github/stars/madebytjs/DeckIntegrity" alt="Stars"></a>
+  <a href="https://github.com/madebytjs/DeckIntegrity/stargazers"><img src="https://img.shields.io/github/stars/madebytjs/DeckIntegrity?v=1" alt="Stars"></a>
   <a href="https://github.com/madebytjs/DeckIntegrity/commits/main"><img src="https://img.shields.io/github/last-commit/madebytjs/DeckIntegrity.svg" alt="Last commit"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/madebytjs/DeckIntegrity" alt="Licence: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/madebytjs/DeckIntegrity?v=1" alt="Licence: MIT"></a>
 </p>
 
 <p align="center">
