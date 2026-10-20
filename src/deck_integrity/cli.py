@@ -12,7 +12,7 @@ import threading
 import time
 import traceback
 
-from deck_integrity import DISCLAIMER, VERSION, reports, runner, sensors, sysinfo
+from deck_integrity import DISCLAIMER, VERSION, overview, reports, runner, sensors, sysinfo
 from deck_integrity.checks import ram, ssd, zero
 from deck_integrity.checks.common import Context
 from deck_integrity.recorder import Recorder, utc_now
@@ -57,10 +57,13 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument('--passes', type=int, help='repetitions per method (default 5)')
     p.add_argument('--file-mib', type=int, help='SSD test file size in MiB (default 2048)')
     p.add_argument('--ram-mib', type=int, help='RAM-backed test file size in MiB (default 256)')
-    p.add_argument('--skip', action='append', default=[], choices=sorted(CHECKS) + ['sysinfo'],
+    p.add_argument('--skip', action='append', default=[], choices=sorted(CHECKS) + ['sysinfo', 'health'],
                    help='skip a check (repeatable)')
     p.add_argument('--output', help='report directory (default ~/deck-integrity-reports/<timestamp>)')
     p.add_argument('--keep-file', action='store_true', help='keep the SSD test file afterwards')
+    p.add_argument('--ssd-health', action='store_true',
+                   help="also read the SSD's own health log (wear, spare, media errors); "
+                        'asks for your admin password through the system prompt')
     p.add_argument('--endurance', type=int, metavar='MINUTES',
                    help='repeat the checks for this many minutes to catch intermittent faults '
                         '(the SSD file is written once, then only read)')
@@ -168,7 +171,7 @@ def run(args, ctx_factory=Context, listeners=(), control: Control | None = None,
     rec.emit('start', version=VERSION, out=str(out), mode=rec.args['mode'], checks=selected,
              passes=None if args.endurance else args.passes,
              duration_s=args.endurance * 60 if args.endurance else None,
-             file_mib=args.file_mib, ram_mib=args.ram_mib)
+             file_mib=args.file_mib, ram_mib=args.ram_mib, ssd_health=args.ssd_health)
     info: dict = {}
     rec.log(f'DeckIntegrity {VERSION} | started {rec.started} (UTC)')
     rec.log('Non-destructive: writes only its own temporary test files and reports. No root required.')
@@ -183,6 +186,13 @@ def run(args, ctx_factory=Context, listeners=(), control: Control | None = None,
             except Exception as e:
                 rec.record('System inventory', 'ERROR', repr(e), {'traceback': traceback.format_exc()},
                            category='System inventory')
+        if 'health' not in args.skip:
+            try:
+                overview.collect_hardware(ctx)
+            except Exception as e:
+                rec.record('Hardware health', 'ERROR', repr(e), {'traceback': traceback.format_exc()},
+                           category='Hardware health')
+            rec.emit('health', cards=overview.cards(rec, final=False))
         for name in args.skip:
             if name in CHECKS:
                 rec.log(f'\n(skipping {name} check as requested)')
@@ -210,6 +220,8 @@ def run(args, ctx_factory=Context, listeners=(), control: Control | None = None,
                 info = sysinfo.collect()
             except Exception:
                 info = {}
+        rec.run_info['health'] = overview.cards(rec, final=True)
+        rec.emit('health', cards=rec.run_info['health'])
         reports.write_all(rec, info)
         c = rec.counts()
         rec.section('SUMMARY')

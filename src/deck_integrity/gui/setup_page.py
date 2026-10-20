@@ -108,6 +108,9 @@ class SetupPage(QWidget):
             self.check_boxes[key] = cb
             v.addWidget(cb)
 
+        self.ssd_health = QCheckBox("SSD health report: reads the drive's own wear and error log "
+                                    '(asks for your admin password)')
+        v.addWidget(self.ssd_health)
         self.adv_toggle = QPushButton('Advanced settings')
         self.adv_toggle.setCheckable(True)
         self.adv_toggle.toggled.connect(lambda on: self.advanced.setVisible(on))
@@ -200,7 +203,7 @@ class SetupPage(QWidget):
                 'passes': self.passes.value(), 'file_mib': self.file_mib.currentData(),
                 'ram_mib': self.ram_mib.currentData(),
                 'skip': [k for k, cb in self.check_boxes.items() if not cb.isChecked()],
-                'keep_file': self.keep_file.isChecked()}
+                'keep_file': self.keep_file.isChecked(), 'ssd_health': self.ssd_health.isChecked()}
 
     def _refresh(self) -> None:
         endurance = self.mode == 'endurance'

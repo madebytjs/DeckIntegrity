@@ -1,6 +1,6 @@
 """DeckIntegrity - non-destructive Linux/SteamOS data-integrity diagnostics."""
 
-VERSION = '0.3.2'
+VERSION = '0.4.0'
 
 # Shown by the app before the first test and in the command-line help. Keep in step
 # with the Disclaimer section of README.md.

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QPainter
-from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QTableWidget, QTableWidgetItem, QWidget
+from PySide6.QtWidgets import (QAbstractItemView, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
+                               QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from deck_integrity.gui import theme
 
@@ -96,13 +97,64 @@ class ResultsTable(QTableWidget):
         self._paint((check, method))
 
 
+HEALTH_COLOURS = {'good': theme.OK, 'warn': theme.WARN, 'bad': theme.FAIL,
+                  'pending': theme.ACCENT, 'unknown': theme.SKIP}
+
+
+class HealthCards(QWidget):
+    """Row of tappable cards, one per health area; tap for the full detail."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.row = QHBoxLayout(self)
+        self.row.setContentsMargins(0, 0, 0, 0)
+        self.row.setSpacing(8)
+        self.cards: dict = {}
+
+    def reset(self) -> None:
+        while self.row.count():
+            w = self.row.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        self.cards = {}
+        self.setVisible(False)
+
+    def set_cards(self, cards: list) -> None:
+        self.reset()
+        for c in cards:
+            colour = HEALTH_COLOURS.get(c['status'], theme.SKIP)
+            b = QPushButton()
+            b.setObjectName('healthcard')
+            b.setMinimumHeight(64)
+            b.setStyleSheet(f'QPushButton#healthcard {{ border-left: 5px solid {colour}; '
+                            f'text-align: left; padding: 6px 10px; }}')
+            v = QVBoxLayout(b)
+            v.setContentsMargins(12, 6, 8, 6)
+            v.setSpacing(2)
+            title = QLabel(c['title'])
+            title.setStyleSheet(f'color: {theme.MUTED}; font-size: 12px;')
+            value = QLabel(c['value'])
+            value.setStyleSheet(f'color: {colour}; font-weight: 600; font-size: 14px;')
+            value.setWordWrap(True)
+            for lbl in (title, value):
+                lbl.setAttribute(Qt.WA_TransparentForMouseEvents)
+                v.addWidget(lbl)
+            b.setToolTip(c['detail'])
+            b.clicked.connect(lambda _=False, c=c: QMessageBox.information(self, c['title'],
+                                                                         f'{c["value"]}\n\n{c["detail"]}'))
+            self.row.addWidget(b, 1)
+            self.cards[c['key']] = {'card': c, 'button': b}
+        self.setVisible(bool(cards))
+
+
 class Timeline(QWidget):
     """Every pass as a tick on a time axis, one lane per check. Red ticks are
     faults, amber errors. Shows at a glance whether faults cluster in time."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(90)
+        self.setMinimumHeight(76)
+        self.setMaximumHeight(96)
         self.reset()
 
     def reset(self, duration_s: float | None = None) -> None:

@@ -54,6 +54,21 @@ def _observed(r: dict) -> list:
     return lines
 
 
+HEALTH_WORDS = {'good': 'OK', 'warn': 'CHECK', 'bad': 'PROBLEM', 'unknown': 'not measured',
+                'pending': 'not finished'}
+
+
+def _health_lines(cards: list) -> list:
+    """Overview cards as plain text: one line per area, with the measured value."""
+    if not cards:
+        return []
+    out = ['HEALTH OVERVIEW']
+    for c in cards:
+        out.append(f'- {c["title"]}: {HEALTH_WORDS.get(c["status"], c["status"])} - {c["value"]}')
+        out.append(f'    {c["detail"]}')
+    return out + ['']
+
+
 def _mmss(seconds) -> str:
     seconds = int(seconds or 0)
     return f'{seconds // 3600}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}'
@@ -106,6 +121,7 @@ def support_summary(rec: Recorder, info: dict) -> str:
              _device_line(info), '',
              'Result counts: ' + ', '.join(f'{k} {v}' for k, v in c.items() if v), '']
     lines += _schedule_lines(rec.run_info.get('scheduler') or {})
+    lines += _health_lines(rec.run_info.get('health') or [])
     if bad:
         lines.append('FAULTS OBSERVED')
         meanings = {}

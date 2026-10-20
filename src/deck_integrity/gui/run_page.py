@@ -5,13 +5,13 @@ import pathlib
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QGuiApplication
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPlainTextEdit, QProgressBar, QPushButton,
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QPlainTextEdit, QProgressBar, QPushButton, QSizePolicy,
                                QVBoxLayout, QWidget)
 
 from deck_integrity import history
 from deck_integrity.gui import theme
 from deck_integrity.gui.setup_page import label, panel
-from deck_integrity.gui.widgets import ResultsTable, Timeline
+from deck_integrity.gui.widgets import HealthCards, ResultsTable, Timeline
 
 VERDICTS = {
     'clean': ('No problems found', 'Your storage, memory and processor handled every test correctly. '
@@ -63,6 +63,7 @@ class RunPage(QWidget):
         v.setSpacing(12)
 
         top = panel()
+        top.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)   # never squash the verdict
         t = QVBoxLayout(top)
         t.setContentsMargins(18, 14, 18, 14)
         row = QHBoxLayout()
@@ -72,6 +73,8 @@ class RunPage(QWidget):
         row.addWidget(self.temp)
         t.addLayout(row)
         self.detail = label('', 'muted', wrap=True)
+        # Wrapped text does not report its height to the layout; reserve room for the verdict.
+        self.detail.setMinimumHeight(68)   # three lines at the 15px theme font
         t.addWidget(self.detail)
         self.bar = QProgressBar()
         self.bar.setRange(0, 1000)
@@ -84,9 +87,12 @@ class RunPage(QWidget):
         t.addLayout(row2)
         v.addWidget(top)
 
+        self.health = HealthCards()
+        v.addWidget(self.health)
         self.timeline = Timeline()
         v.addWidget(self.timeline)
         self.table = ResultsTable()
+        self.table.setMinimumHeight(120)
         v.addWidget(self.table, 1)
 
         self.log = QPlainTextEdit()
@@ -125,6 +131,7 @@ class RunPage(QWidget):
         self.finished = False
         self.peak_temp = None
         self.table.reset()
+        self.health.reset()
         self.timeline.reset()
         self.log.clear()
         self.bar.setValue(0)
@@ -171,6 +178,8 @@ class RunPage(QWidget):
             eta = e.get('eta_s')
             self.times.setText(f'Elapsed {hms(e.get("elapsed_s"))}'
                                + (f'   Remaining {hms(eta)}' if eta is not None else ''))
+        elif kind == 'health':
+            self.health.set_cards(e.get('cards') or [])
         elif kind == 'result':
             self.table.on_result(e)
         elif kind == 'log':

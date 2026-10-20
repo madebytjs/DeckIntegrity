@@ -41,6 +41,8 @@ class EngineUnitTests(unittest.TestCase):
         self.assertNotIn('--passes', e)
         self.assertEqual(e[e.index('--skip') + 1], 'ram')
         self.assertIn('--keep-file', e)
+        self.assertIn('--ssd-health', engine_command({**SMALL, 'ssd_health': True}))
+        self.assertNotIn('--ssd-health', engine_command(SMALL))
         self.assertEqual(engine_command(SMALL)[engine_command(SMALL).index('--passes') + 1], '1')
 
     def test_interpreter_prefers_bundled_python_inside_appimage(self):
@@ -99,6 +101,18 @@ class RunPageTests(unittest.TestCase):
         from deck_integrity.gui.run_page import local_path
         self.assertEqual(local_path('/abs/other'), '/abs/other')
         self.assertIsNone(local_path(None))
+
+    def test_health_cards_render_from_event(self):
+        cards = [{'key': 'battery', 'title': 'Battery', 'status': 'good', 'value': '94% of original',
+                  'detail': 'Holds 37.6 Wh.'},
+                 {'key': 'ssd_health', 'title': 'SSD health', 'status': 'unknown', 'value': 'Not measured',
+                  'detail': 'Needs admin rights.'}]
+        self.page.on_event({'event': 'health', 'cards': cards})
+        self.assertEqual(set(self.page.health.cards), {'battery', 'ssd_health'})
+        self.assertTrue(self.page.health.isVisibleTo(self.page))
+        self.assertEqual(self.page.health.cards['battery']['button'].toolTip(), 'Holds 37.6 Wh.')
+        self.page.reset()
+        self.assertEqual(self.page.health.cards, {})
 
     def test_crash_without_finish_is_reported(self):
         self.page.show_crash(1, ['Traceback ...', 'Boom'])

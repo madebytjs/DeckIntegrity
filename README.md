@@ -36,13 +36,14 @@ It came out of a Steam Deck OLED that gave different results for the same unchan
 > [!WARNING]
 > **Use at your own risk.** DeckIntegrity is unofficial, comes with no warranty, and is not affiliated with Valve or Lenovo. It is designed to be non-destructive, but it does write test files and work your device hard. See the [Disclaimer](#disclaimer).
 
-> **Status:** v0.3.2. Tested on a Legion Go S running SteamOS 3.8. Steam Deck testing is pending.
+> **Status:** v0.4.0. Tested on a Legion Go S running SteamOS 3.8. Steam Deck testing is pending.
 
 ### ✨ Features
 
 - **Simple desktop app:** Quick (about 30 seconds), Full (about 2 minutes) and Endurance (15 minutes to 8 hours) checks
 - **Catches problems that come and go:** Endurance mode repeats the checks and shows on a timeline exactly when anything went wrong, alongside temperatures
 - **Clear results:** "No problems found" or "Problems found", with a plain-English summary to send to support
+- **Health overview:** at-a-glance cards for processor and memory, RAM, storage, SSD wear, battery capacity, filesystem errors and temperatures, each showing the real measured value
 - **Pause, resume and stop** at any point; stopping still saves a full report
 - **Safe by design:** no admin rights, no system changes, nothing installed; test files are written once and always cleaned up
 
@@ -53,12 +54,16 @@ It came out of a Steam Deck OLED that gave different results for the same unchan
 | **Processor and memory** | Sends 2 GiB of known data through the processor and memory and checks it arrives unchanged. Never touches storage. | `/dev/zero` stream hashed three ways (`head \| sha256sum`, `dd \| sha256sum`, Python) against the published SHA-256 |
 | **Memory (RAM)** | Stores test data in memory, reads it back repeatedly and checks it is identical every time. | Random file in `/dev/shm`, hashed by `sha256sum` and Python |
 | **Storage (SSD)** | Writes one test file, then reads it back five different ways and checks every copy matches. Pinpoints which part of the file changed. | Read cold, from page cache and with direct I/O, by coreutils and Python; mismatches located to 32 MiB regions |
+| **SSD health** | Reads the drive's own health log: how much of its rated life is used, spare capacity, and any media errors. Optional, and asks for your admin password. | NVMe SMART log via `smartctl` (read-only), elevated with `pkexec` only when you opt in |
+| **Battery** | How much charge the battery holds now compared with when it was new, and its charge cycles. | `energy_full` / `energy_full_design` (or `charge_*`) from sysfs; no admin rights needed |
 | **Error counters** | Asks the system whether it has already recorded any storage errors or serious kernel problems. | Btrfs and ext4 error counters, kernel taint flags |
 | **Device details** | Records your model, OS and driver versions, so results can be compared between devices and updates. | DMI, OS release, kernel, CPU, GPU, storage, kernel log warnings |
 
 Every result is compared against a reference that was **never read back from storage**: either a published constant or the fingerprint of the data in memory as it was written.
 
-**What it does not check:** SSD wear or remaining lifespan, battery health, screen, controls, or graphics performance. It is not a full memory test like Memtest86 either. A clean result means no problems were seen during that run, not a guarantee of perfect health.
+**What it does not check:** screen, controls, audio or graphics performance. It is not a full memory test like Memtest86 either. A clean result means no problems were seen during that run, not a guarantee of perfect health.
+
+**About the SSD health report:** the drive's health log is normally readable only by an administrator, so DeckIntegrity asks for your password through the system's own prompt, and only if you tick the option. On a Steam Deck there is no admin password until you set one with `passwd` in Konsole. Without it, everything else still runs and the SSD health card shows "Not measured".
 
 ## 💾 Installation
 
@@ -80,6 +85,7 @@ The same engine runs without the app, from Konsole:
 ./DeckIntegrity-x86_64.AppImage --cli --quick              # about 30 seconds
 ./DeckIntegrity-x86_64.AppImage --cli                      # full run: 5 passes, 2 GiB SSD file
 ./DeckIntegrity-x86_64.AppImage --cli --endurance 60       # repeat every check for an hour
+./DeckIntegrity-x86_64.AppImage --cli --ssd-health         # also read the SSD health log (asks for your password)
 ./DeckIntegrity-x86_64.AppImage --cli --help
 ```
 

@@ -29,6 +29,8 @@ def engine_command(options: dict) -> list:
     args += ['--file-mib', str(int(options['file_mib'])), '--ram-mib', str(int(options['ram_mib']))]
     for name in options.get('skip', []):
         args += ['--skip', name]
+    if options.get('ssd_health'):
+        args.append('--ssd-health')
     if options.get('keep_file'):
         args.append('--keep-file')
     if options.get('output'):
