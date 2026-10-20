@@ -56,4 +56,4 @@ PYTHONPATH=src:tests python -m unittest discover -s tests -t tests   # use src;t
 python scripts/build_pyz.py                                           # builds dist/deck-integrity.pyz
 ```
 
-Python 3.9+ standard library only. Background and requirements: [docs/handover.md](docs/handover.md).
+Python 3.9+ standard library only.
