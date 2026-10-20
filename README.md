@@ -21,8 +21,8 @@ Every hash is compared against a reference that was **never read back from disk*
 On the device, in Desktop Mode, open Konsole:
 
 ```bash
-python3 deck-integrity.pyz --quick     # about a minute
-python3 deck-integrity.pyz             # full run: 5 passes, 2 GiB SSD file
+python3 deck-integrity.pyz --quick     # about 30 seconds
+python3 deck-integrity.pyz             # full run: 5 passes, 2 GiB SSD file, about 2 minutes
 python3 deck-integrity.pyz --help
 ```
 

@@ -163,9 +163,16 @@ def run(ctx) -> dict:
             continue
         body = (r.stdout + ('\n' + r.stderr if r.stderr.strip() else '')).strip()
         rec.log(f'\n--- {name}: {" ".join(argv)} (exit {r.returncode}, {r.elapsed:.1f}s) ---\n{body}')
-        denied = any(s in body.lower() for s in LOG_DENIED)
+        # A stray "permission denied" line in otherwise good output (lspci reading one
+        # sysfs label) is not a failure; only flag it when the command produced nothing.
+        denied = (any(s in body.lower() for s in LOG_DENIED)
+                  and (r.returncode != 0 or not r.stdout.strip()))
         if r.timed_out:
             rec.record(name, 'WARN', 'timed out', category=CATEGORY)
+        elif denied and argv[0] == 'dmesg':
+            # SteamOS restricts dmesg to root; the same kernel messages come from journalctl.
+            rec.record(name, 'SKIP', 'restricted to root on this system; see the journalctl kernel log',
+                       category=CATEGORY)
         elif denied:
             rec.record(name, 'WARN', 'not readable as this user; output may be empty or partial',
                        category=CATEGORY)
