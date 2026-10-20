@@ -8,6 +8,7 @@ dynamic = ["version"]
 description = "Non-destructive data-integrity diagnostics for SteamOS handhelds and other Linux machines"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { text = "MIT" }
 
 [project.optional-dependencies]
 gui = ["PySide6-Essentials>=6.7"]

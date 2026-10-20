@@ -17,6 +17,7 @@
   <a href="https://github.com/madebytjs/DeckIntegrity/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/madebytjs/DeckIntegrity/tests.yml?branch=main&label=tests" alt="Tests"></a>
   <a href="https://github.com/madebytjs/DeckIntegrity/stargazers"><img src="https://img.shields.io/github/stars/madebytjs/DeckIntegrity" alt="Stars"></a>
   <a href="https://github.com/madebytjs/DeckIntegrity/commits/main"><img src="https://img.shields.io/github/last-commit/madebytjs/DeckIntegrity.svg" alt="Last commit"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/madebytjs/DeckIntegrity" alt="Licence: MIT"></a>
 </p>
 
 <p align="center">
@@ -118,3 +119,7 @@ python scripts/build_pyz.py                                # builds dist/deck-in
 ```
 
 The engine is Python 3.9+ standard library only; the app adds PySide6. The AppImage is built by GitHub Actions (`scripts/build_appimage.sh`), and pushing a `v*` tag creates a draft release with both downloads attached.
+
+## 📜 Licence
+
+[MIT](LICENSE). Free to use, modify and share; provided as is, without warranty.
