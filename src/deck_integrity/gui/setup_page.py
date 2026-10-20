@@ -11,16 +11,20 @@ from deck_integrity import history, sensors
 from deck_integrity.gui import theme
 
 MODES = {
-    'quick': ('Quick', 'About 30 seconds. 3 passes, small test files.',
+    'quick': ('Quick', 'A fast health check. About 30 seconds.',
               {'passes': 3, 'file_mib': 512, 'ram_mib': 128}),
-    'full': ('Full', 'About 2 minutes. 5 passes, 2 GiB SSD file.',
+    'full': ('Full', 'A thorough health check. About 2 minutes.',
              {'passes': 5, 'file_mib': 2048, 'ram_mib': 256}),
-    'endurance': ('Endurance', 'Repeats every check for a set time to catch faults that come and go.',
+    'endurance': ('Endurance', 'Repeats the checks for a set time, to catch problems that only '
+                               'show up sometimes.',
                   {'passes': 5, 'file_mib': 2048, 'ram_mib': 256}),
 }
-CHECKS = [('zero', '/dev/zero stream (CPU, RAM, kernel; no storage)'),
-          ('ram', 'RAM-backed file'),
-          ('ssd', 'SSD test file (written once, then read 5 ways)')]
+CHECKS = [('zero', 'Processor and memory: streams 2 GiB of data through the CPU and RAM'),
+          ('ram', 'Memory (RAM): stores test data in memory and reads it back'),
+          ('ssd', 'Storage (SSD): writes one test file, then reads it back five ways')]
+INTRO = ('A hardware health check for your data. It tests whether your storage, memory and '
+         'processor store and handle data correctly, by checking the same data many times over. '
+         'It does not measure SSD lifespan, battery health or graphics performance.')
 DURATIONS = [15, 30, 60, 120, 240, 480]
 FILE_SIZES = [256, 512, 1024, 2048, 4096]
 RAM_SIZES = [64, 128, 256, 512]
@@ -59,6 +63,7 @@ class SetupPage(QWidget):
         v = QVBoxLayout(box)
         v.setContentsMargins(18, 18, 18, 18)
         v.setSpacing(12)
+        v.addWidget(label(INTRO, 'muted', wrap=True))
         v.addWidget(label('Choose a test', 'h2'))
         self.mode_group = QButtonGroup(self)
         self.mode_buttons = {}

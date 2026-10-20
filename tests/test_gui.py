@@ -84,9 +84,21 @@ class RunPageTests(unittest.TestCase):
         p.on_event({'event': 'result', 'test': 'Z: m', 'status': 'FAIL'})
         p.on_event({'event': 'finish', 'state': 'completed', 'counts': {'FAIL': 1}, 'out': '/x'})
         self.assertEqual(row['status'], 'FAIL')
-        self.assertEqual(p.status.text(), 'Integrity faults observed')
+        self.assertEqual(p.status.text(), 'Problems found: data did not match')
         self.assertTrue(p.back_btn.isVisibleTo(p))
         self.assertFalse(p.stop_btn.isVisibleTo(p))
+
+    def test_redacted_report_path_is_resolved_for_open_and_copy(self):
+        # Regression: 'Open report folder' tried to open a literal '$HOME/...' path.
+        home = pathlib.Path.home()
+        self.page.on_event({'event': 'start', 'out': '$HOME/deck-integrity-reports/run1', 'mode': 'quick'})
+        self.assertEqual(pathlib.Path(self.page.out), home / 'deck-integrity-reports' / 'run1')
+        self.page.on_event({'event': 'finish', 'state': 'completed', 'counts': {},
+                            'out': '$HOME/deck-integrity-reports/run1'})
+        self.assertEqual(pathlib.Path(self.page.out), home / 'deck-integrity-reports' / 'run1')
+        from deck_integrity.gui.run_page import local_path
+        self.assertEqual(local_path('/abs/other'), '/abs/other')
+        self.assertIsNone(local_path(None))
 
     def test_crash_without_finish_is_reported(self):
         self.page.show_crash(1, ['Traceback ...', 'Boom'])
@@ -162,7 +174,7 @@ class WindowIntegrationTests(unittest.TestCase):
         wait_for(self.win.engine.ended, 120000)
         page = self.win.run_page
         self.assertTrue(page.finished, page.log.toPlainText()[-2000:])
-        self.assertEqual(page.status.text(), 'No faults observed')
+        self.assertEqual(page.status.text(), 'No problems found')
         self.assertTrue(page.table.rows)
         res = json.loads((self.tmp / 'r' / 'results.json').read_text())
         self.assertEqual(res['state'], 'completed')

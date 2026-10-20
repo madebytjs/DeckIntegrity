@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Name=DeckIntegrity
-GenericName=Data integrity diagnostics
-Comment=Non-destructive data-integrity tests for SteamOS handhelds
+GenericName=Hardware health check
+Comment=Checks that your storage, memory and processor handle data correctly
 Exec=deck-integrity-gui
 Icon=deck-integrity
 Categories=System;Utility;

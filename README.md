@@ -21,41 +21,44 @@
 </p>
 
 <p align="center">
-  Non-destructive data-integrity diagnostics for SteamOS handhelds such as the Steam Deck and Legion Go S, and other Linux machines.
+  <b>A hardware health check for SteamOS handhelds</b> such as the Steam Deck and Legion Go S.<br>
+  It tests whether your storage, memory and processor store and handle your data correctly.
 </p>
 
 ## 📖 About
 
-DeckIntegrity reads the same data again and again through independent paths and records every result. If your handheld sometimes corrupts data (files that hash differently each time, games that fail to verify, errors that come and go), it collects evidence you can hand to support or post in a bug report.
+**Is my handheld healthy?** Most "health" tools only read numbers the hardware reports about itself. DeckIntegrity tests the thing that actually matters: whether your device gives you back exactly the data you gave it. It writes known data, reads it back many times through different routes, and checks every copy is identical, down to the last byte.
 
-It came out of a Steam Deck OLED that produced different SHA-256 hashes for the same unchanged file, and even for a stream of zeros that never touches storage. The faults came and went between reboots, which made them hard to prove. This tool repeats the tests for as long as you like, records exactly when anything goes wrong, and keeps what was observed separate from what it might mean.
+If a game keeps failing to verify, files seem to corrupt themselves, installs fail for no clear reason, or you just want peace of mind after a repair, this gives you a clear answer and a report you can hand to support.
+
+It came out of a Steam Deck OLED that gave different results for the same unchanged file, and even for data that never touched the SSD. The problem came and went between reboots, which made it hard to prove. DeckIntegrity can repeat its checks for hours, records exactly when anything goes wrong, and keeps what it observed separate from what it might mean.
 
 > [!WARNING]
 > **Use at your own risk.** DeckIntegrity is unofficial, comes with no warranty, and is not affiliated with Valve or Lenovo. It is designed to be non-destructive, but it does write test files and work your device hard. See the [Disclaimer](#disclaimer).
 
-> **Status:** v0.3.1. The command-line engine has been tested on a Legion Go S running SteamOS 3.8. The desktop app and AppImage are new, and Steam Deck testing is pending.
+> **Status:** v0.3.2. Tested on a Legion Go S running SteamOS 3.8. Steam Deck testing is pending.
 
 ### ✨ Features
 
-- **Desktop app** with Quick (about 30 seconds), Full (about 2 minutes) and Endurance (15 minutes to 8 hours) modes
-- **Live timeline** of every pass, so you can see whether faults cluster in time, plus temperatures
-- **Pause, resume and stop** at any point, and stopping still saves a full report
-- **Independent cross-checks:** coreutils (`sha256sum`, `dd`) and Python's own hashing, buffered and direct I/O
-- **Locates corruption** in the SSD test file to 32 MiB regions
-- **Reports for support:** a short plain-text summary, a full log and machine-readable JSON
-- **Safe by design:** no root, no system changes, no installs; test files are written once and always cleaned up
+- **Simple desktop app:** Quick (about 30 seconds), Full (about 2 minutes) and Endurance (15 minutes to 8 hours) checks
+- **Catches problems that come and go:** Endurance mode repeats the checks and shows on a timeline exactly when anything went wrong, alongside temperatures
+- **Clear results:** "No problems found" or "Problems found", with a plain-English summary to send to support
+- **Pause, resume and stop** at any point; stopping still saves a full report
+- **Safe by design:** no admin rights, no system changes, nothing installed; test files are written once and always cleaned up
 
 ### 🔬 What it checks
 
-| Check | What it does | Touches the SSD? |
+| Check | In plain English | Technical detail |
 |---|---|---|
-| 2 GiB `/dev/zero` stream | Hashes a known stream three ways (`head \| sha256sum`, `dd \| sha256sum`, Python) against the published hash | No |
-| RAM-backed file | Random file in `/dev/shm`, hashed by `sha256sum` and Python | No |
-| SSD test file | Random file in your home folder, read back five ways: cold buffered, page cache, cold buffered (Python), direct I/O (`dd`), direct I/O (Python) | Writes once, then only reads |
-| Inventory | OS, kernel, device, CPU, GPU, storage, kernel log warnings | No |
-| Counters | Btrfs and ext4 error counters, kernel taint flags | No |
+| **Processor and memory** | Sends 2 GiB of known data through the processor and memory and checks it arrives unchanged. Never touches storage. | `/dev/zero` stream hashed three ways (`head \| sha256sum`, `dd \| sha256sum`, Python) against the published SHA-256 |
+| **Memory (RAM)** | Stores test data in memory, reads it back repeatedly and checks it is identical every time. | Random file in `/dev/shm`, hashed by `sha256sum` and Python |
+| **Storage (SSD)** | Writes one test file, then reads it back five different ways and checks every copy matches. Pinpoints which part of the file changed. | Read cold, from page cache and with direct I/O, by coreutils and Python; mismatches located to 32 MiB regions |
+| **Error counters** | Asks the system whether it has already recorded any storage errors or serious kernel problems. | Btrfs and ext4 error counters, kernel taint flags |
+| **Device details** | Records your model, OS and driver versions, so results can be compared between devices and updates. | DMI, OS release, kernel, CPU, GPU, storage, kernel log warnings |
 
-Every hash is compared against a reference that was **never read back from disk**: either a published constant or the hash of the data in memory as it was written.
+Every result is compared against a reference that was **never read back from storage**: either a published constant or the fingerprint of the data in memory as it was written.
+
+**What it does not check:** SSD wear or remaining lifespan, battery health, screen, controls, or graphics performance. It is not a full memory test like Memtest86 either. A clean result means no problems were seen during that run, not a guarantee of perfect health.
 
 ## 💾 Installation
 

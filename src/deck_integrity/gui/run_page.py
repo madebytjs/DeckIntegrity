@@ -14,15 +14,28 @@ from deck_integrity.gui.setup_page import label, panel
 from deck_integrity.gui.widgets import ResultsTable, Timeline
 
 VERDICTS = {
-    'clean': ('No faults observed', 'Every pass of every check matched. This does not certify the '
-              'device: intermittent faults can be missed, so an endurance run is worth doing.'),
-    'faults': ('Integrity faults observed', 'At least one pass produced data that did not match. '
-               'The support summary lists what failed, when, and what each check means.'),
-    'errors': ('Some checks could not complete', 'No data mismatches, but some passes errored. '
-               'See the report for details.'),
+    'clean': ('No problems found', 'Your storage, memory and processor handled every test correctly. '
+              'That is a good sign, but one run cannot prove a device is healthy: problems that come '
+              'and go can be missed, so an Endurance run is worth doing.'),
+    'faults': ('Problems found: data did not match', 'Some data came back different from what was '
+               'written or expected. That points to a hardware or system fault, but not to which part. '
+               "The support summary lists what failed and when; share it with your device maker's "
+               'support.'),
+    'errors': ('Some checks could not finish', 'No data mismatches were seen, but some checks could '
+               'not complete. See the log or report for details.'),
     'stopped': ('Stopped early', 'Results up to the stop were saved.'),
     'unknown': ('Finished', ''),
 }
+
+
+def local_path(path: str | None) -> str | None:
+    """Undo report redaction for local use: the engine writes '$HOME/...' so shared
+    reports do not reveal a username, but the app must open the real folder."""
+    if path == '$HOME':
+        return str(pathlib.Path.home())
+    if path and path[:6] in ('$HOME/', '$HOME\\'):
+        return str(pathlib.Path.home() / path[6:])
+    return path
 
 
 def running_title(mode: str) -> str:
@@ -137,7 +150,7 @@ class RunPage(QWidget):
     def on_event(self, e: dict) -> None:
         kind = e.get('event')
         if kind == 'start':
-            self.out = e.get('out')
+            self.out = local_path(e.get('out'))
             self.timeline.reset(e.get('duration_s'))
             self._set_status(running_title(e.get('mode') or ''), theme.ACCENT)
             self.detail.setText(f'Reports: {self.out}')
@@ -171,7 +184,7 @@ class RunPage(QWidget):
 
     def show_finished(self, verdict: str, out: str | None = None) -> None:
         self.finished = True
-        self.out = out or self.out
+        self.out = local_path(out) or self.out
         title, text = VERDICTS[verdict]
         self._set_status(title, theme.VERDICT_COLOURS[verdict])
         self.detail.setText(text + (f'\nReports: {self.out}' if self.out else ''))

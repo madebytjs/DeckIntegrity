@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "deck-integrity"
 dynamic = ["version"]
-description = "Non-destructive data-integrity diagnostics for SteamOS handhelds and other Linux machines"
+description = "Hardware health check for SteamOS handhelds: tests that storage, memory and processor handle data correctly"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

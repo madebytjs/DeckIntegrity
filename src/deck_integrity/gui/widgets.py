@@ -8,6 +8,13 @@ from PySide6.QtWidgets import QAbstractItemView, QHeaderView, QTableWidget, QTab
 from deck_integrity.gui import theme
 
 COLUMNS = ['Check', 'Method', 'Passes', 'Faults', 'Errors', 'Status']
+# Engine check names are technical and appear in reports; the app shows plain names.
+FRIENDLY = {'2 GiB /dev/zero stream': 'Processor and memory', 'RAM-backed file': 'Memory (RAM)',
+            'SSD test file': 'Storage (SSD)'}
+
+
+def friendly(check: str) -> str:
+    return FRIENDLY.get(check, check)
 
 
 class ResultsTable(QTableWidget):
@@ -17,6 +24,7 @@ class ResultsTable(QTableWidget):
         super().__init__(0, len(COLUMNS), parent)
         self.setHorizontalHeaderLabels(COLUMNS)
         self.verticalHeader().setVisible(False)
+        self.verticalHeader().setDefaultSectionSize(27)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.NoSelection)
         self.setFocusPolicy(Qt.NoFocus)
@@ -39,7 +47,7 @@ class ResultsTable(QTableWidget):
             self.insertRow(r)
             self.rows[key] = {'row': r, 'passes': 0, 'faults': 0, 'errors': 0, 'status': 'RUNNING'}
             first_of_check = not any(k[0] == check for k in self.rows if k != key)
-            self._set(r, 0, check if first_of_check else '', theme.MUTED)
+            self._set(r, 0, friendly(check) if first_of_check else '', theme.MUTED)
             self._set(r, 1, method)
             self._paint(key)
         return self.rows[key]
@@ -129,7 +137,7 @@ class Timeline(QWidget):
             y = 4 + i * lane_h
             p.setPen(QColor(theme.MUTED))
             p.drawText(QRectF(6, y, label_w - 10, lane_h), Qt.AlignVCenter | Qt.AlignLeft,
-                       name.replace(' stream', '').replace(' test file', '').replace('-backed file', ''))
+                       friendly(name))
             p.fillRect(QRectF(label_w, y + lane_h / 2 - 1, w - label_w - 8, 2), QColor(theme.BORDER))
         # Draw ok ticks first so faults stay visible on top.
         for wanted in ('ok', 'error', 'mismatch'):
