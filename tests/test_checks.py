@@ -161,8 +161,9 @@ class SsdTests(Base):
             raise OSError('No space left on device')
 
         ctx.generate_random_file = boom
-        with self.assertRaises(OSError):
-            ssd.run(ctx)
+        ssd.run(ctx)   # setup failure is recorded, not raised, so other checks can still run
+        self.assertEqual(ctx.rec.results[-1]['status'], 'ERROR')
+        self.assertIn('No space left', ctx.rec.results[-1]['summary'])
         self.assertEqual(self.leftovers(), [])
 
 

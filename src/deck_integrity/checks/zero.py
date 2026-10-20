@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import os
 
-from deck_integrity.checks.common import Method, hash_obs, run_methods, tool_obs
+from deck_integrity.checks.common import CheckPlan, Method, hash_obs, tool_obs
 from deck_integrity.hashing import GIB
+from deck_integrity.scheduler import run_checks
 
 # SHA-256 of exactly 2 GiB (2147483648 bytes) of 0x00. A published constant,
 # deliberately not computed at run time on the machine under test.
@@ -18,13 +19,13 @@ MEANING = ('The zero stream is produced by the kernel in memory and never read f
            'that points more towards that tool or code path than towards general corruption.')
 
 
-def run(ctx) -> None:
+def prepare(ctx) -> CheckPlan | None:
     rec = ctx.rec
     rec.section(CHECK)
     dev = ctx.zero_device
     if not os.path.exists(dev):
         rec.record(CHECK, 'SKIP', dev + ' not present', category=CHECK)
-        return
+        return None
     timeout = ctx.timeout_for(SIZE // (1024 ** 2))
 
     def head_sha(p):
@@ -46,4 +47,9 @@ def run(ctx) -> None:
         Method('dd | sha256sum', 'coreutils', dd_sha),
         Method('Python hashlib', 'python', python),
     ]
-    run_methods(ctx, CHECK, methods, ctx.args.passes, EXPECTED_2GIB, SIZE, MEANING)
+    return CheckPlan(CHECK, methods, EXPECTED_2GIB, SIZE, MEANING)
+
+
+def run(ctx) -> None:
+    """Run this check on its own (tests, scripting)."""
+    run_checks(ctx, [prepare], passes=ctx.args.passes)

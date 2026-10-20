@@ -34,6 +34,20 @@ class Recorder:
         self.system: dict = {}
         self.results: list = []
         self.commands: list = []
+        self.run_info: dict = {}      # run-level facts (scheduler mode, rounds, first failure)
+        self.live: dict | None = None  # per-round observations while checks are still running
+        self.listeners: list = []      # callables(event: dict), e.g. the --events JSON writer
+
+    # -- events ---------------------------------------------------------
+    def emit(self, event: str, **data) -> None:
+        if not self.listeners:
+            return
+        msg = {'event': event, 'at': utc_now(), **self.redact_obj(data)}
+        for fn in list(self.listeners):
+            try:
+                fn(msg)
+            except Exception:
+                pass   # a broken listener (e.g. closed pipe) must never stop the tests
 
     # -- text log -------------------------------------------------------
     def log(self, msg='') -> None:
@@ -42,9 +56,11 @@ class Recorder:
             self.echo(s, flush=True)
         with self.report.open('a', encoding='utf-8', errors='replace') as f:
             f.write(s + '\n')
+        self.emit('log', line=s)
 
     def section(self, title: str) -> None:
         self.log('\n=== ' + title + ' ===')
+        self.emit('section', title=title)
 
     # -- structured -----------------------------------------------------
     def command(self, name: str, result) -> dict:
@@ -64,6 +80,8 @@ class Recorder:
                  'data': self.redact_obj(data or {})}
         self.results.append(entry)
         self.log(f'[{status}] {name}: {entry["summary"]}')
+        self.emit('result', test=name, category=category, status=status, summary=entry['summary'],
+                  stats=entry['data'].get('stats'), elapsed_s=entry['elapsed_s'])
         self.save()
         return entry
 
@@ -82,8 +100,8 @@ class Recorder:
     def to_dict(self) -> dict:
         return {'tool': 'Deck Integrity Suite', 'version': VERSION, 'state': self.state,
                 'started_utc': self.started, 'finished_utc': self.finished,
-                'args': self.args, 'counts': self.counts(), 'tests': self.results,
-                'commands': self.commands}
+                'args': self.args, 'run': self.run_info, 'counts': self.counts(),
+                'tests': self.results, 'live': self.live, 'commands': self.commands}
 
     def save(self) -> None:
         write_json(self.out / 'results.json', self.to_dict())

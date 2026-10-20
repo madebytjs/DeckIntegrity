@@ -7,7 +7,9 @@ import tempfile
 import time
 
 from deck_integrity import sensors
-from deck_integrity.checks.common import Method, free_mib, hash_obs, run_methods, tool_obs, writable_dir
+from deck_integrity.checks.common import (CheckPlan, Method, free_mib, hash_obs, tool_obs,
+                                          writable_dir)
+from deck_integrity.scheduler import run_checks
 
 CHECK = 'RAM-backed file'
 MEANING = ('The test file lives in RAM (/dev/shm), so these reads do not touch the SSD. The '
@@ -16,13 +18,13 @@ MEANING = ('The test file lives in RAM (/dev/shm), so these reads do not touch t
            'exhaustive memory test such as Memtest86.')
 
 
-def run(ctx) -> None:
+def prepare(ctx) -> CheckPlan | None:
     rec = ctx.rec
     rec.section(CHECK + ' (/dev/shm)')
     shm = pathlib.Path(ctx.shm)
     if not writable_dir(shm):
         rec.record(CHECK, 'SKIP', f'{shm} unavailable or not writable', category=CHECK)
-        return
+        return None
     avail_mib = sensors.meminfo().get('MemAvailable', 0) // 1024
     limits = [ctx.args.ram_mib, free_mib(shm) - 64]
     if avail_mib:
@@ -30,29 +32,38 @@ def run(ctx) -> None:
     size = min(limits)
     if size < 32:
         rec.record(CHECK, 'SKIP', f'insufficient RAM-backed space (limits {limits} MiB)', category=CHECK)
-        return
+        return None
     if size < ctx.args.ram_mib:
         rec.log(f'  Reduced RAM test size to {size} MiB to stay within safe limits.')
     fd, name = tempfile.mkstemp(prefix='deck-integrity-', suffix='.bin', dir=str(shm))
     os.close(fd)
     path = pathlib.Path(name)
+
+    def cleanup():
+        path.unlink(missing_ok=True)
+
     try:
         t0 = time.monotonic()
         ref = ctx.generate_random_file(path, size)
-        rec.record(f'{CHECK}: generate {size} MiB', 'INFO', f'reference sha256={ref.sha256}',
-                   {'size_mib': size, 'reference': ref.to_dict()}, category=CHECK, started=t0)
-        timeout = ctx.timeout_for(size)
+    except BaseException:
+        cleanup()
+        raise
+    rec.record(f'{CHECK}: generate {size} MiB', 'INFO', f'reference sha256={ref.sha256}',
+               {'size_mib': size, 'reference': ref.to_dict()}, category=CHECK, started=t0)
+    timeout = ctx.timeout_for(size)
 
-        def coreutils(p):
-            return tool_obs(ctx, f'{CHECK}: sha256sum pass {p}',
-                            ctx.run_command(['sha256sum', str(path)], timeout))
+    def coreutils(p):
+        return tool_obs(ctx, f'{CHECK}: sha256sum pass {p}',
+                        ctx.run_command(['sha256sum', str(path)], timeout))
 
-        def python(p):
-            return hash_obs(ctx.hash_file(path), ref.chunk_hashes)
+    def python(p):
+        return hash_obs(ctx.hash_file(path), ref.chunk_hashes)
 
-        methods = [Method('sha256sum', 'coreutils', coreutils),
-                   Method('Python hashlib', 'python', python)]
-        run_methods(ctx, CHECK, methods, ctx.args.passes, ref.sha256, ref.bytes, MEANING,
-                    {'size_mib': size})
-    finally:
-        path.unlink(missing_ok=True)
+    methods = [Method('sha256sum', 'coreutils', coreutils),
+               Method('Python hashlib', 'python', python)]
+    return CheckPlan(CHECK, methods, ref.sha256, ref.bytes, MEANING, {'size_mib': size}, cleanup)
+
+
+def run(ctx) -> None:
+    """Run this check on its own (tests, scripting)."""
+    run_checks(ctx, [prepare], passes=ctx.args.passes)

@@ -23,8 +23,11 @@ On the device, in Desktop Mode, open Konsole:
 ```bash
 python3 deck-integrity.pyz --quick     # about 30 seconds
 python3 deck-integrity.pyz             # full run: 5 passes, 2 GiB SSD file, about 2 minutes
+python3 deck-integrity.pyz --endurance 60   # repeat every check for an hour to catch intermittent faults
 python3 deck-integrity.pyz --help
 ```
+
+Endurance mode writes its test files once and then only reads them, so a long run adds no extra SSD wear. It records when the first failure happened and every failure after it, with temperatures. Ctrl+C at any point still produces a full report of what ran.
 
 It only runs from a terminal. Double-clicking it does nothing apart from a notification, because it writes a large test file. Scripts and launchers can pass `--yes`.
 

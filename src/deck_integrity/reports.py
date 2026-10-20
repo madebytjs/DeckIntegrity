@@ -54,6 +54,33 @@ def _observed(r: dict) -> list:
     return lines
 
 
+def _mmss(seconds) -> str:
+    seconds = int(seconds or 0)
+    return f'{seconds // 3600}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}'
+
+
+def _schedule_lines(s: dict) -> list:
+    """Run shape, and for endurance runs how faults were spread over time."""
+    if not s:
+        return []
+    out = []
+    if s.get('mode') == 'endurance':
+        planned = (s.get('duration_s') or 0) / 60
+        out.append(f'ENDURANCE RUN: planned {planned:g} min, ran {_mmss(s.get("active_s"))}'
+                   f' (h:mm:ss) over {s.get("rounds")} rounds'
+                   + (f', paused {_mmss(s.get("paused_s"))}' if s.get('paused_s') else '')
+                   + (' - stopped early' if s.get('interrupted') else ''))
+    times = s.get('failure_times_s') or []
+    ff = s.get('first_failure')
+    if ff:
+        temp = f', max temp {ff["max_temp_c"]} C' if ff.get('max_temp_c') is not None else ''
+        out.append(f'First failure: {ff["check"]} / {ff["method"]}, pass {ff["pass"]}, '
+                   f'{_mmss(ff["at_s"])} into the run{temp}')
+        out.append(f'Failed passes: {len(times)}, at ' +
+                   ', '.join(_mmss(t) for t in times[:20]) + (' ...' if len(times) > 20 else ''))
+    return out + ([''] if out else [])
+
+
 def failures_text(rec: Recorder) -> str:
     bad = [r for r in rec.results if r['status'] in ('FAIL', 'ERROR')]
     if not bad:
@@ -78,6 +105,7 @@ def support_summary(rec: Recorder, info: dict) -> str:
              f'Run: {rec.started} to {rec.finished or "?"} (UTC), state: {rec.state}',
              _device_line(info), '',
              'Result counts: ' + ', '.join(f'{k} {v}' for k, v in c.items() if v), '']
+    lines += _schedule_lines(rec.run_info.get('scheduler') or {})
     if bad:
         lines.append('FAULTS OBSERVED')
         meanings = {}

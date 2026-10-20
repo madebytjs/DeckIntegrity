@@ -11,7 +11,6 @@ import os
 import pathlib
 import re
 import shutil
-import time
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -37,6 +36,7 @@ class Context:
     generate_random_file: Callable = hashing.generate_random_file
     evict_cache: Callable = hashing.evict_cache
     snapshot: Callable = sensors.snapshot
+    control: object = None   # scheduler.Control; set by the CLI
 
     @staticmethod
     def timeout_for(size_mib: int) -> float:
@@ -51,6 +51,18 @@ class Method:
     fn: Callable[[int], dict]  # pass number -> observation dict
     unsupported: str = ''
     observations: list = field(default_factory=list)
+
+
+@dataclass
+class CheckPlan:
+    """A prepared check: its methods, what correct looks like, and how to clean up."""
+    name: str
+    methods: list
+    expected_sha: str | None
+    expected_bytes: int | None
+    meaning: str
+    extra: dict = field(default_factory=dict)
+    cleanup: Callable | None = None
 
 
 # -- observation builders ---------------------------------------------------
@@ -133,74 +145,6 @@ def evaluate(observations: list, expected_sha: str | None, expected_bytes: int |
         return 'WARN', (f'{len(done)} completed passes all correct, but {len(errored)} '
                         f'could not complete: {errored[0]["error"]}'), stats
     return 'PASS', f'{len(done)}/{len(done)} passes correct{tail}', stats
-
-
-def run_methods(ctx: Context, check: str, methods: list, passes: int,
-                expected_sha: str | None, expected_bytes: int | None, meaning: str,
-                extra: dict | None = None) -> None:
-    """Run methods round-robin for `passes` passes, then record one result per method.
-
-    Results are recorded in a finally block, so an interrupted run still
-    reports every pass that finished.
-    """
-    rec = ctx.rec
-    before = ctx.snapshot()
-    t0 = time.monotonic()
-    first_failure_logged = False
-    interrupted = False
-    try:
-        for p in range(1, passes + 1):
-            for m in methods:
-                if m.unsupported:
-                    continue
-                obs = m.fn(p)
-                obs['pass'] = p
-                snap = ctx.snapshot() or {}
-                temps = snap.get('temps_c') or {}
-                obs['uptime_s'] = snap.get('uptime_s')
-                obs['max_temp_c'] = max(temps.values()) if temps else None
-                if obs.get('unsupported'):
-                    m.unsupported = obs['unsupported']
-                    rec.log(f'  {m.name}: not available ({m.unsupported})')
-                    continue
-                m.observations.append(obs)
-                bad = (obs.get('error') or (expected_sha and obs['sha256'] != expected_sha) or
-                       (expected_bytes and obs.get('bytes') is not None and obs['bytes'] != expected_bytes))
-                flag = '' if not bad else ('  <-- ERROR' if obs.get('error') else '  <-- MISMATCH')
-                nbytes = f'{obs["bytes"]} bytes, ' if obs.get('bytes') is not None else ''
-                rec.log(f'  {m.name} pass {p}/{passes}: {obs["sha256"] or "-"} '
-                        f'({nbytes}{obs["elapsed_s"]}s){flag}' +
-                        (f' {obs["error"]}' if obs.get('error') else ''))
-                if obs.get('chunk_mismatches'):
-                    offs = ', '.join(str(c['offset_mib']) for c in obs['chunk_mismatches'][:8])
-                    rec.log(f'    differing 32 MiB regions at MiB offsets: {offs}'
-                            f'{" ..." if obs["chunk_mismatch_count"] > 8 else ""}')
-                if bad and not obs.get('error') and not first_failure_logged:
-                    first_failure_logged = True
-                    rec.log(f'  FIRST FAILURE: {check} / {m.name}, pass {p}, '
-                            f'{time.monotonic() - t0:.1f}s into this check')
-    except KeyboardInterrupt:
-        interrupted = True
-        raise
-    finally:
-        after = ctx.snapshot()
-        for m in methods:
-            data = {'check': check, 'method': m.name, 'implementation': m.implementation,
-                    'expected_sha256': expected_sha, 'expected_bytes': expected_bytes,
-                    'passes_requested': passes, 'interrupted': interrupted,
-                    'observations': m.observations, 'meaning': meaning,
-                    'snapshot_before': before, 'snapshot_after': after}
-            data.update(extra or {})
-            if m.unsupported:
-                rec.record(f'{check}: {m.name}', 'SKIP', m.unsupported, data, category=check)
-                continue
-            status, summary, stats = evaluate(m.observations, expected_sha, expected_bytes)
-            data['stats'] = stats
-            if interrupted:
-                summary = f'(interrupted after {len(m.observations)} passes) ' + summary
-                if status == 'PASS':
-                    status = 'WARN'
-            rec.record(f'{check}: {m.name}', status, summary, data, category=check, started=t0)
 
 
 def free_mib(path) -> int:

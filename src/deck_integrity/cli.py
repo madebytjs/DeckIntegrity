@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import pathlib
 import re
 import signal
 import sys
+import threading
 import time
 import traceback
 
@@ -14,9 +16,10 @@ from deck_integrity import VERSION, reports, runner, sensors, sysinfo
 from deck_integrity.checks import ram, ssd, zero
 from deck_integrity.checks.common import Context
 from deck_integrity.recorder import Recorder, utc_now
+from deck_integrity.scheduler import Control, run_checks
 from deck_integrity.redact import Redactor
 
-CHECKS = {'zero': zero.run, 'ram': ram.run, 'ssd': ssd.run}
+CHECKS = {'zero': zero.prepare, 'ram': ram.prepare, 'ssd': ssd.prepare}
 EXIT_OK, EXIT_FAIL, EXIT_ERROR, EXIT_NOT_CONFIRMED, EXIT_INTERRUPTED = 0, 1, 2, 3, 130
 LOW_BATTERY_PCT = 20
 DEFAULTS = {'passes': 5, 'file_mib': 2048, 'ram_mib': 256}
@@ -57,8 +60,14 @@ def parse_args(argv=None) -> argparse.Namespace:
                    help='skip a check (repeatable)')
     p.add_argument('--output', help='report directory (default ~/deck-integrity-reports/<timestamp>)')
     p.add_argument('--keep-file', action='store_true', help='keep the SSD test file afterwards')
+    p.add_argument('--endurance', type=int, metavar='MINUTES',
+                   help='repeat the checks for this many minutes to catch intermittent faults '
+                        '(the SSD file is written once, then only read)')
     p.add_argument('--yes', action='store_true',
                    help='run even without a terminal (scripts, launchers); never needed in Konsole')
+    p.add_argument('--events', action='store_true',
+                   help='machine interface for the GUI: JSON lines on stdout; reads '
+                        'pause/resume/stop commands from stdin')
     a = p.parse_args(argv)
     preset = QUICK if a.quick else DEFAULTS
     for k, v in preset.items():
@@ -70,6 +79,8 @@ def parse_args(argv=None) -> argparse.Namespace:
         p.error('--file-mib must be 32-16384')
     if not 32 <= a.ram_mib <= 4096:
         p.error('--ram-mib must be 32-4096')
+    if a.endurance is not None and not 1 <= a.endurance <= 1440:
+        p.error('--endurance must be 1-1440 minutes')
     return a
 
 
@@ -95,6 +106,8 @@ def os_label(rel: dict) -> str:
 
 def mode_label(args) -> str:
     sizes = {k: getattr(args, k) for k in DEFAULTS}
+    if getattr(args, 'endurance', None):
+        return f'endurance-{args.endurance}m' + ('-partial' if args.skip else '')
     if args.skip:
         return 'partial'
     if sizes == QUICK:
@@ -142,12 +155,19 @@ def preflight(ctx) -> None:
             rec.log(f'Battery: {bat["capacity_pct"]}% ({bat.get("status")})')
 
 
-def run(args, ctx_factory=Context) -> int:
+def run(args, ctx_factory=Context, listeners=(), control: Control | None = None, echo=print) -> int:
     out = pathlib.Path(args.output).expanduser().resolve() if args.output else default_output(args)
-    rec = Recorder(out, Redactor())
+    rec = Recorder(out, Redactor(), echo=echo)
+    rec.listeners.extend(listeners)
     rec.args = {k: v for k, v in vars(args).items() if k != 'output'}
     rec.args['mode'] = mode_label(args)
     ctx = ctx_factory(rec=rec, args=args)
+    ctx.control = control or Control()
+    selected = [n for n in CHECKS if n not in args.skip]
+    rec.emit('start', version=VERSION, out=str(out), mode=rec.args['mode'], checks=selected,
+             passes=None if args.endurance else args.passes,
+             duration_s=args.endurance * 60 if args.endurance else None,
+             file_mib=args.file_mib, ram_mib=args.ram_mib)
     info: dict = {}
     rec.log(f'Deck Integrity Suite {VERSION} | started {rec.started} (UTC)')
     rec.log('Non-destructive: writes only its own temporary test files and reports. No root required.')
@@ -162,15 +182,18 @@ def run(args, ctx_factory=Context) -> int:
             except Exception as e:
                 rec.record('System inventory', 'ERROR', repr(e), {'traceback': traceback.format_exc()},
                            category='System inventory')
-        for name, fn in CHECKS.items():
-            if name in args.skip:
+        for name in args.skip:
+            if name in CHECKS:
                 rec.log(f'\n(skipping {name} check as requested)')
-                continue
-            try:
-                fn(ctx)
-            except Exception as e:
-                rec.record(f'{name} check', 'ERROR', 'check crashed: ' + repr(e),
-                           {'traceback': traceback.format_exc()}, category=name)
+        preparers = [(name, CHECKS[name]) for name in selected]
+        try:
+            if args.endurance:
+                run_checks(ctx, preparers, duration_s=args.endurance * 60)
+            else:
+                run_checks(ctx, preparers, passes=args.passes)
+        except Exception as e:
+            rec.record('Checks', 'ERROR', 'scheduler crashed: ' + repr(e),
+                       {'traceback': traceback.format_exc()}, category='setup')
         rec.state = 'completed'
     except KeyboardInterrupt as e:
         rec.state = 'interrupted'
@@ -193,6 +216,13 @@ def run(args, ctx_factory=Context) -> int:
         rec.log('A PASS means no fault was observed in this run; it does not certify the device.')
         rec.log('Review reports for personal identifiers before posting publicly.')
         rec.log('Reports: ' + str(out))
+    code = exit_code(rec)
+    rec.emit('finish', state=rec.state, counts=rec.counts(), exit_code=code, out=str(out),
+             run=rec.run_info)
+    return code
+
+
+def exit_code(rec) -> int:
     c = rec.counts()
     if rec.state == 'interrupted':
         return EXIT_INTERRUPTED
@@ -203,6 +233,37 @@ def run(args, ctx_factory=Context) -> int:
     return EXIT_OK
 
 
+def json_lines_writer(control: Control, stream=None):
+    """Listener that writes events as JSON lines. If the reader has gone away
+    (the GUI closed), stop the run cleanly instead of testing on unattended."""
+    def write(msg):
+        out = stream or sys.stdout
+        try:
+            out.write(json.dumps(msg, default=str) + '\n')
+            out.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            control.stop()
+    return write
+
+
+def control_reader(control: Control, stream=None) -> threading.Thread:
+    """Read pause/resume/stop commands, one per line. End of input means the
+    controlling program has gone away, so stop."""
+    def loop():
+        for line in (stream or sys.stdin):
+            cmd = line.strip().lower()
+            if cmd == 'pause':
+                control.pause()
+            elif cmd == 'resume':
+                control.resume()
+            elif cmd == 'stop':
+                control.stop()
+        control.stop()
+    t = threading.Thread(target=loop, name='control-reader', daemon=True)
+    t.start()
+    return t
+
+
 def main(argv=None) -> int:
     args = parse_args(argv)
     if not args.yes and not interactive():
@@ -210,6 +271,10 @@ def main(argv=None) -> int:
         notify(NOT_CONFIRMED_MSG)
         return EXIT_NOT_CONFIRMED
     install_signal_handlers()
+    if args.events:
+        control = Control()
+        control_reader(control)
+        return run(args, listeners=[json_lines_writer(control)], control=control, echo=None)
     return run(args)
 
 
